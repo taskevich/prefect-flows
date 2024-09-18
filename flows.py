@@ -19,6 +19,7 @@ def load_data(input_csv: str, chunk_size: int):
 def request_api(row: dict):
     logger = get_run_logger()
     try:
+        return row
         response = httpx.post(os.getenv("API_URL"), json=row)  # предполагается, что отправляем и получаем json
         response.raise_for_status()
         return response.json()
@@ -45,7 +46,7 @@ def send_to_telegram():
 
 
 @flow(log_prints=True)
-def process_csv(input_csv: str, output_csv: str, chunk_size: int = 5000):
+def process_csv(input_csv: str = "data.csv", output_csv: str = "result.csv", chunk_size: int = 5000):
     logger = get_run_logger()
     chunks = load_data(input_csv, chunk_size)
 
