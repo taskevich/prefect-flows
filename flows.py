@@ -46,7 +46,7 @@ def send_to_telegram():
 
 
 @flow(log_prints=True)
-def process_csv(input_file: str = "data.csv", output_file: str = "result.csv", chunk_size: int = 5000):
+def process_csv(input_file: str, output_file: str, chunk_size: int = 5000):
     if not os.path.exists(input_file):
         raise RuntimeError("No dataset file found.")
 
