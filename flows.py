@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 @task
 def load_data(input_csv: str, chunk_size: int):
-    return pd.read_csv(input_csv, chunksize=chunk_size)
+    return pd.read_csv(input_csv, chunksize=chunk_size, encoding="utf-8")
 
 
 @task(retries=3, retry_delay_seconds=5, cache_key_fn=task_input_hash,
@@ -66,7 +66,6 @@ def process_csv(input_file: str, output_file: str, chunk_size: int = 5000):
                 responses.append(future.result())
             except Exception as exc:
                 logger.error(f"Строка {row} вызвала исключение: {exc}")
-        # time.sleep(30)
 
     logger.info(f"Обработка ответов API")
     processed_responses = process_responses(responses)
