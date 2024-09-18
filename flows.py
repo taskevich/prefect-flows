@@ -46,9 +46,12 @@ def send_to_telegram():
 
 
 @flow(log_prints=True)
-def process_csv(input_csv: str = "data.csv", output_csv: str = "result.csv", chunk_size: int = 5000):
+def process_csv(input_file: str = "data.csv", output_file: str = "result.csv", chunk_size: int = 5000):
+    if not os.path.exists(input_file):
+        raise RuntimeError("No dataset file found.")
+
     logger = get_run_logger()
-    chunks = load_data(input_csv, chunk_size)
+    chunks = load_data(input_file, chunk_size)
 
     responses = []
     with ThreadPoolExecutor(max_workers=16) as executor:
@@ -63,12 +66,16 @@ def process_csv(input_csv: str = "data.csv", output_csv: str = "result.csv", chu
                 responses.append(future.result())
             except Exception as exc:
                 logger.error(f"Строка {row} вызвала исключение: {exc}")
-            time.sleep(30)
+        # time.sleep(30)
 
+    logger.info(f"Обработка ответов API")
     processed_responses = process_responses(responses)
 
-    save_json(processed_responses, output_csv)
+    logger.info(f"Сохранение результатов в {output_file}")
+    save_json(processed_responses, output_file)
 
 
 if __name__ == "__main__":
-    process_csv("data.csv", "data_result.json")
+    if not os.path.exists("data.csv"):
+        raise RuntimeError("No dataset file found.")
+    process_csv("data.csv", "result.json")
