@@ -1,0 +1,14 @@
+version: '3.3'
+
+services:
+  app:
+    build:
+      context: src
+      dockerfile: Dockerfile
+    deploy:
+      resources:
+        limits:
+          cpus: 0.5
+          memory: 1GB
+    env_file:
+      - .env
