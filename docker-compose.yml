@@ -17,6 +17,7 @@ services:
       - flows-api
     environment:
       - API_URL=http://flows-api:8000
+      - BOT_TOKEN=XXX
     volumes:
       - ./results:/results
     container_name: flows

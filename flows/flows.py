@@ -12,6 +12,7 @@ from pydantic import BaseModel, constr
 class InputFlowData(BaseModel):
     inputFile: constr(strip_whitespace=True, min_length=1)
     chunkSize: int = 5000
+    notifyId: int  # Предполагается мы знаем telegram id пользователя
 
 
 @task
@@ -46,6 +47,17 @@ def save_json(processed_data: pd.DataFrame):
     )
 
 
+@task
+def send_to_telegram(notify_id: int):
+    logger = get_run_logger()
+    response = httpx.post(
+        url=f"https://api.telegram.org/bot{os.getenv('BOT_TOKEN')}/sendmessage",
+        json={"chat_id": notify_id, "text": "Обработка завершена"}
+    )
+    response.raise_for_status()
+    logger.info("Уведомление в телеграмм отправлено")
+
+
 @flow(log_prints=True, task_runner=ThreadPoolTaskRunner(max_workers=4))
 def process_csv(request: InputFlowData):
     logger = get_run_logger()
@@ -67,6 +79,9 @@ def process_csv(request: InputFlowData):
 
     logger.info(f"Сохранение результатов")
     save_json(processed_responses)
+
+    logger.info(f"Отправка сообщения о завершении обработки {request.notifyId}")
+    send_to_telegram(request.notifyId)
 
 
 if __name__ == "__main__":
