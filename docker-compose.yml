@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  flows-api:
+    build:
+      context: api
+      dockerfile: Dockerfile
+    container_name: flows-api
+    ports:
+      - "8000:8000"
+
+  flows:
+    build:
+      context: flows
+      dockerfile: Dockerfile
+    container_name: flows
+    depends_on:
+      - flows-api
+    environment:
+      - API_URL=http://flows-api:8000
+    volumes:
+      - ./results:/results

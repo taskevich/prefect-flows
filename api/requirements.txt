@@ -1,0 +1,6 @@
+prefect
+pandas
+requests
+aiogram
+uvicorn
+fastapi
