@@ -13,10 +13,12 @@ services:
     build:
       context: flows
       dockerfile: Dockerfile
-    container_name: flows
     depends_on:
       - flows-api
     environment:
       - API_URL=http://flows-api:8000
     volumes:
       - ./results:/results
+    container_name: flows
+    ports:
+      - "4200:4200"
