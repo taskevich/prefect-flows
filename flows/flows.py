@@ -42,7 +42,7 @@ def process_chunk(chunk: list[dict]):
     df.dropna(axis=1, how="all", inplace=True)
 
     logger.info(f"Сохранение результатов")
-    save_json(df)
+    return df
 
 
 @task
@@ -64,6 +64,19 @@ def send_to_telegram(notify_id: int):
     logger.info("Уведомление в телеграмм отправлено")
 
 
+@task
+def process(chunk):
+    logger = get_run_logger()
+    responses = []
+
+    for _, row in chunk.iterrows():
+        responses.append(request_api(row.to_dict()))
+
+    logger.info("Обработка ответов")
+
+    return process_chunk(responses)
+
+
 @flow(log_prints=True, task_runner=ThreadPoolTaskRunner(max_workers=NUM_WORKERS))
 def process_csv(request: InputFlowData):
     logger = get_run_logger()
@@ -74,19 +87,14 @@ def process_csv(request: InputFlowData):
     logger.info("Загрузка данных из CSV")
     chunks = load_data(request.inputFile, request.chunkSize)
 
+    results = []
     for chunk in chunks:
-        responses = []
+        results.append(process.submit(chunk).result())
 
-        for _, row in chunk.iterrows():
-            responses.append(request_api(row.to_dict()))
+    results = pd.concat(results, ignore_index=True)
 
-        logger.info("Обработка ответов")
-
-        chunk_size = len(responses) // NUM_WORKERS
-        chunks = [responses[i:i + chunk_size] for i in range(0, len(responses), chunk_size)]
-
-        for c in chunks:
-            process_chunk.submit(c)
+    logger.info("Сохранение результатов")
+    save_json(results)
 
     logger.info(f"Отправка сообщения о завершении обработки {request.notifyId}")
     send_to_telegram(request.notifyId)
@@ -96,5 +104,5 @@ if __name__ == "__main__":
     process_csv(InputFlowData(
         inputFile="data.csv",
         chunkSize=300,
-        notifyId=0
+        notifyId=1838352338
     ))
