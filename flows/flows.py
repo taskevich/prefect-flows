@@ -19,7 +19,7 @@ def request_api(row: dict):
     logger = get_run_logger()
     try:
         # предполагается, что отправляем и получаем json
-        response = httpx.post(os.getenv("API_URL") + "/data", json=row)
+        response = httpx.post(os.getenv("API_URL", "http://0.0.0.0:8000") + "/data", json=row)
         response.raise_for_status()
         return response.json()
     except Exception as ex:
