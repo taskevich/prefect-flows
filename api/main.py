@@ -1,4 +1,16 @@
+from typing import Any, Optional
+
 from fastapi import FastAPI, Request
+from pydantic import BaseModel
+
+
+class RequestData(BaseModel):
+    data: Optional[Any]
+
+
+class ResponseData(BaseModel):
+    data: Optional[Any]
+
 
 app = FastAPI()
 
@@ -8,6 +20,6 @@ async def main():
     return {"error": False, "message": "OK", "payload": []}
 
 
-@app.post("/data")
-async def process_data(request: Request):
-    return await request.json()
+@app.post("/data", response_model=ResponseData)
+async def process_data(request: RequestData):
+    return ResponseData(data=request.data)

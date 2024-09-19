@@ -4,9 +4,10 @@ import pandas as pd
 import httpx
 
 from prefect import flow, task, get_run_logger
-from time import sleep
 from prefect.task_runners import ThreadPoolTaskRunner
 from pydantic import BaseModel, constr
+
+NUM_WORKERS = 4
 
 
 class InputFlowData(BaseModel):
@@ -19,11 +20,12 @@ class InputFlowData(BaseModel):
 def request_api(row: dict):
     logger = get_run_logger()
     try:
-        response = httpx.post(os.getenv("API_URL", "http://127.0.0.1:8000") + "/data", json=row)
+        logger.info(f"Sending: {row}")
+        response = httpx.post(os.getenv("API_URL", "http://127.0.0.1:8000") + "/data", json={"data": row})
         response.raise_for_status()
         return response.json()
     except Exception as ex:
-        logger.error(f"Error occurred: {ex}")
+        logger.error(f"Error occurred: {ex} on {row}")
         raise
 
 
@@ -33,10 +35,14 @@ def load_data(input_csv: str, chunk_size: int):
 
 
 @task
-def process_responses(responses: list):
-    df = pd.DataFrame(responses)
+def process_chunk(chunk: list[dict]):
+    logger = get_run_logger()
+
+    df = pd.DataFrame(chunk)
     df.dropna(axis=1, how="all", inplace=True)
-    return df
+
+    logger.info(f"Сохранение результатов")
+    save_json(df)
 
 
 @task
@@ -58,7 +64,7 @@ def send_to_telegram(notify_id: int):
     logger.info("Уведомление в телеграмм отправлено")
 
 
-@flow(log_prints=True, task_runner=ThreadPoolTaskRunner(max_workers=4))
+@flow(log_prints=True, task_runner=ThreadPoolTaskRunner(max_workers=NUM_WORKERS))
 def process_csv(request: InputFlowData):
     logger = get_run_logger()
 
@@ -67,18 +73,20 @@ def process_csv(request: InputFlowData):
 
     logger.info("Загрузка данных из CSV")
     chunks = load_data(request.inputFile, request.chunkSize)
-    responses = []
 
     for chunk in chunks:
+        responses = []
+
         for _, row in chunk.iterrows():
-            responses.append(request_api.submit(row.to_dict()))
-        sleep(30)
+            responses.append(request_api(row.to_dict()))
 
-    logger.info("Обработка ответов")
-    processed_responses = process_responses(responses)
+        logger.info("Обработка ответов")
 
-    logger.info(f"Сохранение результатов")
-    save_json(processed_responses)
+        chunk_size = len(responses) // NUM_WORKERS
+        chunks = [responses[i:i + chunk_size] for i in range(0, len(responses), chunk_size)]
+
+        for c in chunks:
+            process_chunk.submit(c)
 
     logger.info(f"Отправка сообщения о завершении обработки {request.notifyId}")
     send_to_telegram(request.notifyId)
@@ -87,6 +95,6 @@ def process_csv(request: InputFlowData):
 if __name__ == "__main__":
     process_csv(InputFlowData(
         inputFile="data.csv",
-        chunkSize=5000,
+        chunkSize=300,
         notifyId=0
     ))
