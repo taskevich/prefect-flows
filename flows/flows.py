@@ -1,4 +1,6 @@
 import os
+from typing import Optional
+
 import pandas as pd
 import httpx
 
@@ -6,6 +8,13 @@ from prefect.tasks import task_input_hash
 from prefect import flow, task, get_run_logger
 from datetime import timedelta
 from prefect.task_runners import ThreadPoolTaskRunner
+from pydantic import BaseModel, constr
+
+
+class InputFlowData(BaseModel):
+    inputFile: Optional[constr(strip_whitespace=True, min_length=1)]
+    outFile: Optional[constr(strip_whitespace=True, min_length=1)]
+    chunkSize: Optional[int] = 5000
 
 
 @task
@@ -36,7 +45,7 @@ def process_responses(responses: list):
 
 @task
 def save_json(processed_data: pd.DataFrame, output_file: str):
-    processed_data.to_json(f"/results/{output_file}", orient="records")
+    processed_data.to_json(output_file, orient="records")
 
 
 @task
@@ -45,12 +54,12 @@ def send_to_telegram():
 
 
 @flow(log_prints=True, task_runner=ThreadPoolTaskRunner(max_workers=16))
-def process_csv(input_file: str, output_file: str, chunk_size: int = 5000):
-    if not os.path.exists(input_file):
+def process_csv(request: InputFlowData):
+    if not os.path.exists(request.inputFile):
         raise RuntimeError("No dataset file found.")
 
     logger = get_run_logger()
-    chunks = load_data(input_file, chunk_size)
+    chunks = load_data(request.inputFile, request.chunkSize)
     responses = []
 
     logger.info("Обработка чанков с данными")
@@ -61,11 +70,15 @@ def process_csv(input_file: str, output_file: str, chunk_size: int = 5000):
     logger.info(f"Обработка ответов API")
     processed_responses = process_responses(responses)
 
-    logger.info(f"Сохранение результатов в {output_file}")
-    save_json(processed_responses, output_file)
+    logger.info(f"Сохранение результатов в {request.outFile}")
+    save_json(processed_responses, request.outFile)
 
 
 if __name__ == "__main__":
     if not os.path.exists("data.csv"):
         raise RuntimeError("No dataset file found.")
-    process_csv("data.csv", "result.json")
+    process_csv(InputFlowData(
+        inputFile="data.csv",
+        outFile="result.json",
+        chunkSize=5000
+    ))
