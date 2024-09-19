@@ -87,5 +87,6 @@ def process_csv(request: InputFlowData):
 if __name__ == "__main__":
     process_csv(InputFlowData(
         inputFile="data.csv",
-        chunkSize=5000
+        chunkSize=5000,
+        notifyId=0
     ))
